@@ -4,11 +4,11 @@
 #include "io.h"
 #include "text.h"
 
-double *getrow(dataframe *df, int row) {
+extern double *getrow(dataframe *df, int row) {
   return &df->data[df->ncols * row];
 }
 
-double *vecalloc(int ncols) {
+extern double *vecalloc(int ncols) {
   return malloc(sizeof(double) * ncols);
 }
 

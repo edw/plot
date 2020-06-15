@@ -24,6 +24,7 @@ void histo_file(
   mapped_file *mf, int nbins, bfb *fb, char **caption,
   int left, int top, int width, int height)
 {
+
   dataframe *df = parse_file(mf, 1);
   double min = DBL_MAX, max = DBL_MIN;
 
@@ -32,12 +33,14 @@ void histo_file(
     max = max > df->data[i] ? max : df->data[i];
   }
 
-  double bin_w = (max - min)/(nbins + 1.0);
+  double bin_w = (max - min)/nbins;
   double *bins = vecalloc(nbins);
   for (int i=0; i<nbins; i++) bins[i] = 0.0;
-  for (int i=0; i<df->nrows; i++)
-    bins[(int)round((df->data[i]-min)/bin_w)] += 1.0;
-
+  for (int i=0; i<df->nrows; i++) {
+    double el = df->data[i];
+    int bindex = el == max ? nbins - 1 : (int)trunc((el-min)/bin_w);
+    bins[bindex] += 1.0;
+  }
   double binmax = DBL_MIN;
   for(int i=0; i<nbins; i++) binmax = binmax > bins[i] ? binmax : bins[i];
 
@@ -54,6 +57,7 @@ void histo_file(
   asprintf(caption, "n bins: %d\nwidth: %f\nmin: %f\nmax: %f\n",
            nbins, bin_w, min, max);
 
+  free(bins);
   free_dataframe(df);
 }
 
@@ -139,7 +143,7 @@ enum plot_type {
 };
 
 int main(int argc, char **argv) {
-  int plot_w = 150, plot_h = 60, nbins = 11;
+  int plot_w = 150, plot_h = 60, nbins = 11, show_caption = 1;
   enum plot_type plot_type = SCATTER2D;
   progname = *argv;
   argv++;
@@ -156,6 +160,10 @@ int main(int argc, char **argv) {
       argv++;
       nbins= atoi(*argv++);
       argc -= 2;
+    } else if (strcmp("--no-caption", *argv) == 0) {
+      argv++;
+      show_caption = 0;
+      argc -= 1;
     } else if (strcmp("--type", *argv) == 0) {
       argv++;
       if (strcmp("scatter", *argv) == 0) {
@@ -176,8 +184,9 @@ int main(int argc, char **argv) {
   mapped_file mf;
   mf.fp = copy_to_tmpfile(stdin, &mf.length);
   mf_map(&mf);
+
   bfb plot;
-  char *caption;
+  char *caption = NULL;
 
   init_bfb(&plot, plot_w, plot_h, 0);
 
@@ -204,8 +213,12 @@ int main(int argc, char **argv) {
   }
 
   bfb_fput(&plot, stdout);
-  fprintf(stdout, "%s", caption);
-  mf_unmap(&mf, 1);
+  if (show_caption)
+    fprintf(stdout, "%s", caption);
+  free(caption);
 
+  finalize_bfb(&plot);
+
+  mf_unmap(&mf, 1);
   return EXIT_SUCCESS;
 }
